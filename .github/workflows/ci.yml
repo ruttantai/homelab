@@ -19,3 +19,7 @@ jobs:
       - run: terraform -chdir=terraform test
       - run: pip install yamllint==1.38.0
       - run: yamllint .
+      - run: pip install ansible-core==2.21.4 ansible-lint==26.9.0
+      - run: ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
+      - run: ansible-lint
+        working-directory: ansible

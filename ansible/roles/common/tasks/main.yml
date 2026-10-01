@@ -1,0 +1,70 @@
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - unattended-upgrades
+      - python3-venv
+      - curl
+      - ca-certificates
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Turn off password and root SSH logins
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-homelab.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ssh
+
+- name: Enable unattended security upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Allow SSH, HTTP and the Kubernetes API
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: ["22", "80", "6443"]
+
+- name: Allow kubelet from cluster nodes only
+  community.general.ufw:
+    rule: allow
+    port: "10250"
+    proto: tcp
+    src: "{{ hostvars[item]['ansible_host'] }}"
+  loop: "{{ groups['all'] }}"
+
+- name: Allow flannel VXLAN from cluster nodes only
+  community.general.ufw:
+    rule: allow
+    port: "8472"
+    proto: udp
+    src: "{{ hostvars[item]['ansible_host'] }}"
+  loop: "{{ groups['all'] }}"
+
+- name: Allow in-cluster pod and service traffic
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+  loop:
+    - "{{ k3s_pod_cidr }}"
+    - "{{ k3s_service_cidr }}"
+
+- name: Deny other incoming traffic and enable the firewall
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny

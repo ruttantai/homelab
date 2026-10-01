@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -39,3 +39,20 @@ lint:
 	$(TF) init -backend=false -input=false >/dev/null
 	$(TF) validate
 	$(TF) test
+	cd ansible && ansible-lint
+
+# --force: the full "ansible" package (vs. ansible-core) bundles its own copies of
+# community.general/ansible.posix: without --force, ansible-galaxy sees a version-
+# satisfying collection already present elsewhere and skips it, so it never lands
+# under ansible/collections and ansible-lint can't resolve its modules.
+collections:
+	cd ansible && ansible-galaxy collection install -r requirements.yml -p collections --force >/dev/null
+
+configure: collections
+	cd ansible && ansible-playbook site.yml
+
+verify: collections
+	cd ansible && ansible-playbook verify.yml
+
+idempotency:
+	scripts/check-idempotent.sh

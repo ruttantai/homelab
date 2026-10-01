@@ -1,0 +1,28 @@
+# Assertions about the running cluster. `make verify` runs this; later tasks append plays.
+- name: Verify node baseline
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read effective sshd settings
+      ansible.builtin.command: sshd -T
+      register: verify_sshd
+      changed_when: false
+
+    - name: Password and root login are off
+      ansible.builtin.assert:
+        that:
+          - "'passwordauthentication no' in verify_sshd.stdout_lines"
+          - "'permitrootlogin no' in verify_sshd.stdout_lines"
+
+    - name: Read firewall status
+      ansible.builtin.command: ufw status verbose
+      register: verify_ufw
+      changed_when: false
+
+    - name: Firewall is on and denies by default
+      ansible.builtin.assert:
+        that:
+          - "'Status: active' in verify_ufw.stdout"
+          - "'deny (incoming)' in verify_ufw.stdout"
+          - "'10.42.0.0/16' in verify_ufw.stdout"

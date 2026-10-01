@@ -1,6 +1,6 @@
 profile: production
+# ansible-lint is always invoked with cwd=ansible/ (see Makefile `lint` target and
+# CI's `working-directory: ansible`), and it resolves exclude_paths against that cwd,
+# not against this file's own directory at the repo root.
 exclude_paths:
-  - ansible/collections/
-  - terraform/
-  - k8s/
-  - .github/
+  - collections/

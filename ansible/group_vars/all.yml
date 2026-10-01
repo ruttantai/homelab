@@ -1,0 +1,17 @@
+# Every version the cluster runs, pinned in one place.
+k3s_version: v1.37.1+k3s1
+helm_version: v3.22.0
+kubernetes_python_version: "36.0.3"
+kube_prometheus_stack_version: "91.8.2"
+loki_chart_version: "7.3.0"
+alloy_chart_version: "1.13.0"
+
+k3s_pod_cidr: 10.42.0.0/16
+k3s_service_cidr: 10.43.0.0/16
+k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
+homelab_venv: /opt/homelab-venv
+homelab_remote_dir: /opt/homelab
+
+# Generated once on the Mac by the password lookup, reused on every later run.
+secrets_dir: "{{ playbook_dir }}/../.secrets"
+server_ip: "{{ hostvars[groups['k3s_server'][0]]['ansible_host'] }}"
