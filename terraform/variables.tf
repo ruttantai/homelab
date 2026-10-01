@@ -23,9 +23,12 @@ variable "cpus" {
 }
 
 variable "memory" {
+  # 2G was not enough headroom: a normal Grafana rolling update briefly runs
+  # two kps-grafana pods (each with 2 extra sidecar containers) side by side,
+  # and on a 2 GiB node that tipped cp-1 into an OOM kill (spec §10 fallback).
   description = "RAM per node, Multipass size syntax."
   type        = string
-  default     = "2G"
+  default     = "3G"
 }
 
 variable "disk" {
