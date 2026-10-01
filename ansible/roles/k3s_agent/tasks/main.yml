@@ -1,15 +1,28 @@
+- name: Ensure /etc/rancher/k3s exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Write the join token to a root-only file
+  ansible.builtin.copy:
+    content: "{{ hostvars[groups['k3s_server'][0]]['k3s_server_token'] }}"
+    dest: /etc/rancher/k3s/join-token
+    owner: root
+    mode: "0600"
+  no_log: true
+
 - name: Join the cluster as an agent
   ansible.builtin.shell: |
     set -o pipefail
     curl -sfL https://get.k3s.io \
       | INSTALL_K3S_VERSION={{ k3s_version }} \
         K3S_URL=https://{{ server_ip }}:6443 \
-        K3S_TOKEN={{ hostvars[groups['k3s_server'][0]]['k3s_server_token'] }} \
+        K3S_TOKEN_FILE=/etc/rancher/k3s/join-token \
         sh -s - agent --node-ip {{ ansible_host }}
   args:
     executable: /bin/bash
     creates: /usr/local/bin/k3s
-  no_log: true
 
 - name: Wait until this node is Ready
   ansible.builtin.command: k3s kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=180s
