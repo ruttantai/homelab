@@ -1,7 +1,8 @@
-# Every recipe runs in bash with -euo pipefail, so a failing step stops the target.
+# Works with GNU make 3.81 (macOS default): no .ONESHELL, no .SHELLFLAGS (3.81 ignores both).
+# Recipe lines are independent shells - each line must be self-contained. Anything multi-line
+# goes in scripts/*.sh with `set -euo pipefail`; a line containing a pipe starts with
+# `set -o pipefail;` so a failure upstream of the pipe isn't swallowed.
 SHELL := /bin/bash
-.SHELLFLAGS := -euo pipefail -c
-.ONESHELL:
 .DEFAULT_GOAL := help
 
 TF := terraform -chdir=terraform
@@ -15,10 +16,7 @@ help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
 
 prereqs:
-	for t in multipass terraform ansible-playbook kubectl jq; do
-	  command -v $$t >/dev/null || { echo "missing: $$t (see README)"; exit 1; }
-	done
-	echo "prereqs ok"
+	@for t in multipass terraform ansible-playbook kubectl jq; do command -v $$t >/dev/null || { echo "missing: $$t (see README)"; exit 1; }; done; echo "prereqs ok"
 
 keys:
 	test -f $(SSH_KEY) || ssh-keygen -q -t ed25519 -N '' -C homelab -f $(SSH_KEY)
