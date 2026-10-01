@@ -1,0 +1,12 @@
+#cloud-config
+# `default` keeps Multipass's own ubuntu user, which `multipass shell` relies on.
+users:
+  - default
+  - name: ops
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+ssh_pwauth: false

@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint
+.PHONY: help prereqs keys lint infra down
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -21,5 +21,19 @@ prereqs:
 keys:
 	test -f $(SSH_KEY) || ssh-keygen -q -t ed25519 -N '' -C homelab -f $(SSH_KEY)
 
+infra: keys
+	$(TF) init -input=false
+	$(TF) apply -auto-approve -input=false
+
+# Works even after a half-finished `up`: destroy only touches what state records.
+down:
+	$(TF) init -input=false >/dev/null
+	$(TF) destroy -auto-approve -input=false
+	multipass purge
+
 lint:
 	yamllint .
+	terraform fmt -check -recursive terraform
+	$(TF) init -backend=false -input=false >/dev/null
+	$(TF) validate
+	$(TF) test

@@ -10,5 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - run: terraform fmt -check -recursive terraform
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+      - run: terraform -chdir=terraform test
       - run: pip install yamllint==1.38.0
       - run: yamllint .
