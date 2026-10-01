@@ -1,0 +1,46 @@
+# `creates` makes the install run once. Changing k3s_version later needs a rebuild
+# (`make down && make up`), which is how this lab is meant to be used.
+- name: Install the k3s server
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sfL https://get.k3s.io \
+      | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server \
+          --node-ip {{ ansible_host }} --tls-san {{ ansible_host }} --write-kubeconfig-mode 0600
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/k3s
+
+- name: Wait for the join token
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/k3s/server/node-token
+
+- name: Read the join token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_server_token_file
+
+- name: Keep the token for the agents
+  ansible.builtin.set_fact:
+    k3s_server_token: "{{ k3s_server_token_file.content | b64decode | trim }}"
+  no_log: true
+
+- name: Read the admin kubeconfig
+  ansible.builtin.slurp:
+    src: "{{ k3s_kubeconfig }}"
+  register: k3s_server_kubeconfig
+
+- name: Ensure ~/.kube exists on the Mac
+  ansible.builtin.file:
+    path: "{{ lookup('env', 'HOME') }}/.kube"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Write the kubeconfig on the Mac, pointed at cp-1
+  ansible.builtin.copy:
+    content: "{{ k3s_server_kubeconfig.content | b64decode | replace('https://127.0.0.1:6443', 'https://' ~ ansible_host ~ ':6443') }}"
+    dest: "{{ lookup('env', 'HOME') }}/.kube/homelab.yaml"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

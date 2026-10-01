@@ -26,3 +26,24 @@
           - "'Status: active' in verify_ufw.stdout"
           - "'deny (incoming)' in verify_ufw.stdout"
           - "'10.42.0.0/16' in verify_ufw.stdout"
+
+- name: Verify the cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read nodes with the Mac's kubeconfig
+      ansible.builtin.command: kubectl --kubeconfig {{ lookup('env', 'HOME') }}/.kube/homelab.yaml get nodes -o json
+      register: verify_nodes
+      changed_when: false
+
+    - name: Three nodes, all Ready
+      vars:
+        verify_ready: >-
+          {{ (verify_nodes.stdout | from_json)['items']
+             | map(attribute='status.conditions') | map('selectattr', 'type', 'equalto', 'Ready')
+             | map('first') | map(attribute='status') | list }}
+      ansible.builtin.assert:
+        that:
+          - verify_ready | length == 3
+          - verify_ready | unique == ['True']

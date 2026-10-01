@@ -3,3 +3,15 @@
   become: true
   roles:
     - common
+
+- name: Control plane
+  hosts: k3s_server
+  become: true
+  roles:
+    - k3s_server
+
+- name: Workers
+  hosts: k3s_agent
+  become: true
+  roles:
+    - k3s_agent
