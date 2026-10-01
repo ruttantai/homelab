@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -67,3 +67,15 @@ urls:
 
 oom-demo:
 	scripts/check-oom.sh
+
+up: prereqs infra configure urls
+
+status:
+	multipass list
+	kubectl get nodes -o wide
+	kubectl get pods -A
+
+# Clean build -> idempotent re-run -> assertions -> OOM demo -> teardown.
+# KEEP=1 skips the teardown so a failure can be inspected.
+test:
+	KEEP=$(KEEP) scripts/test.sh
