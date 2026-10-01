@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -60,3 +60,6 @@ idempotency:
 
 smoke:
 	scripts/smoke-k3d.sh
+
+urls:
+	scripts/urls.sh

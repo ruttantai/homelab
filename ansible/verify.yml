@@ -47,3 +47,20 @@
         that:
           - verify_ready | length == 3
           - verify_ready | unique == ['True']
+
+- name: Verify ley-khaa
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Dashboard is served at /
+      ansible.builtin.uri:
+        url: "http://{{ server_ip }}/"
+        return_content: true
+      register: verify_dashboard
+      failed_when: "'<div id=\"root\">' not in verify_dashboard.content"
+
+    - name: API answers through the frontend's /api proxy
+      ansible.builtin.uri:
+        url: "http://{{ server_ip }}/api/health"
+        status_code: 200

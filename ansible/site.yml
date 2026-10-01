@@ -15,3 +15,10 @@
   become: true
   roles:
     - k3s_agent
+
+- name: Cluster workloads
+  hosts: k3s_server
+  become: true
+  roles:
+    - k8s_tooling
+    - ley_khaa

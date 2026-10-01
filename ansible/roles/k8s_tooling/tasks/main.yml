@@ -1,0 +1,16 @@
+- name: Install Helm
+  ansible.builtin.unarchive:
+    src: "https://get.helm.sh/helm-{{ helm_version }}-linux-{{ k8s_tooling_arch }}.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    include: ["linux-{{ k8s_tooling_arch }}/helm"]
+    extra_opts: ["--strip-components=1"]
+    creates: /usr/local/bin/helm
+  vars:
+    k8s_tooling_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
+
+- name: Install the Kubernetes Python client in its own venv
+  ansible.builtin.pip:
+    name: "kubernetes=={{ kubernetes_python_version }}"
+    virtualenv: "{{ homelab_venv }}"
+    virtualenv_command: python3 -m venv
