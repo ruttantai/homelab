@@ -23,3 +23,16 @@ jobs:
       - run: ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
       - run: ansible-lint
         working-directory: ansible
+      - name: kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP" kubeconform
+          kubectl kustomize k8s/ley-khaa | "$RUNNER_TEMP/kubeconform" -strict -summary -
+
+  smoke:
+    needs: static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -sSL https://raw.githubusercontent.com/k3d-io/k3d/v5.9.0/install.sh | TAG=v5.9.0 bash
+      - run: scripts/smoke-k3d.sh

@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: task-workspaces
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  # One writer: the workspace volume is ReadWriteOnce and the backend runs
+  # database migrations at start-up, so old and new pods must not overlap.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/ruttantai/ley-khaa-backend
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ley-khaa-db
+                  key: password
+            - name: DATABASE_URL
+              value: postgresql+psycopg://ley:$(POSTGRES_PASSWORD)@postgres:5432/leykhaa
+            # No API key in the cluster: the offline heuristic model (spec §6).
+            - name: LEY_KHAA_LLM
+              value: heuristic
+            # k3s runs containerd; there is no Docker socket for DockerSandbox.
+            - name: LEY_KHAA_SANDBOX
+              value: subprocess
+            - name: LEY_KHAA_WORKSPACE_ROOT
+              value: /work/task-workspaces
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: task-workspaces
+              mountPath: /work/task-workspaces
+      volumes:
+        - name: task-workspaces
+          persistentVolumeClaim:
+            claimName: task-workspaces
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
