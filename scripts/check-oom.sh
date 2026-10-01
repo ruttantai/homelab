@@ -10,19 +10,26 @@ cd "$(dirname "$0")/.."
 prom=/api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy
 loki=/api/v1/namespaces/monitoring/services/loki:3100/proxy
 
-kubectl -n demo delete job oom-demo --ignore-not-found --wait=true >/dev/null 2>&1 || true
+# --cascade=foreground makes this block until the Job's pods are gone too (not just the
+# Job object), so a prior run's pod can never still be around when the new Job is applied.
+kubectl -n demo delete job oom-demo --ignore-not-found --cascade=foreground --wait=true >/dev/null 2>&1 || true
+kubectl -n demo wait --for=delete pod -l app=oom-demo --timeout=60s >/dev/null 2>&1 || true
 kubectl apply -f k8s/demo/oom-job.yaml
+
+# Select the pod by this run's Job uid (not just app=oom-demo), so a label query can never
+# pick up a pod left over from a previous run.
+job_uid=$(kubectl -n demo get job oom-demo -o jsonpath='{.metadata.uid}')
 
 echo "1/3 waiting for the pod to be OOMKilled"
 reason=""
 for _ in $(seq 1 120); do
-  reason=$(kubectl -n demo get pods -l app=oom-demo \
+  reason=$(kubectl -n demo get pods -l "batch.kubernetes.io/controller-uid=$job_uid" \
     -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.reason}' 2>/dev/null || true)
   [ "$reason" = OOMKilled ] && break
   sleep 1
 done
 [ "$reason" = OOMKilled ] || { echo "FAIL: pod never reached OOMKilled (last reason: '${reason}')" >&2; exit 1; }
-pod=$(kubectl -n demo get pods -l app=oom-demo -o jsonpath='{.items[0].metadata.name}')
+pod=$(kubectl -n demo get pods -l "batch.kubernetes.io/controller-uid=$job_uid" -o jsonpath='{.items[0].metadata.name}')
 echo "    $pod: OOMKilled"
 
 echo "2/3 waiting for ContainerOOMKilled to fire (up to 3 min)"
@@ -41,8 +48,12 @@ echo "    alert firing"
 loki_lines() {
   local q
   q=$(jq -rn --arg q "{namespace=\"demo\", pod=\"$pod\"} |= \"allocated\"" '$q | @uri')
-  kubectl get --raw "$loki/loki/api/v1/query_range?query=${q}&since=1h&limit=200" \
-    | jq '[.data.result[].values[]] | length'
+  # Always print an integer: a service-proxy/jq failure (e.g. Loki briefly unreachable, or a
+  # response with no .data.result) must fall back to 0 and let the polling loop / final
+  # assertion FAIL cleanly, instead of aborting the whole script under `set -euo pipefail`.
+  kubectl get --raw "$loki/loki/api/v1/query_range?query=${q}&since=1h&limit=200" 2>/dev/null \
+    | jq '[(.data.result // [])[].values[]] | length' 2>/dev/null \
+    || echo 0
 }
 
 echo "3/3 checking the logs outlive the pod"
