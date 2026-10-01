@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -41,6 +41,7 @@ lint:
 	$(TF) test
 	cd ansible && ansible-lint
 	set -o pipefail; kubectl kustomize k8s/ley-khaa | kubeconform -strict -summary -
+	kubeconform -strict -summary k8s/demo
 
 # --force: the full "ansible" package (vs. ansible-core) bundles its own copies of
 # community.general/ansible.posix: without --force, ansible-galaxy sees a version-
@@ -63,3 +64,6 @@ smoke:
 
 urls:
 	scripts/urls.sh
+
+oom-demo:
+	scripts/check-oom.sh
