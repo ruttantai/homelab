@@ -1,0 +1,49 @@
+- name: Monitoring stack
+  vars:
+    ansible_python_interpreter: "{{ homelab_venv }}/bin/python"
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+  block:
+    - name: Add the chart repositories
+      kubernetes.core.helm_repository:
+        name: "{{ item.name }}"
+        repo_url: "{{ item.url }}"
+      loop:
+        - { name: prometheus-community, url: "https://prometheus-community.github.io/helm-charts" }
+        - { name: grafana, url: "https://grafana.github.io/helm-charts" }
+
+    - name: Install kube-prometheus-stack
+      kubernetes.core.helm:
+        name: kps
+        chart_ref: prometheus-community/kube-prometheus-stack
+        chart_version: "{{ kube_prometheus_stack_version }}"
+        release_namespace: monitoring
+        create_namespace: true
+        values: "{{ lookup('ansible.builtin.template', 'kps-values.yaml.j2') | from_yaml }}"
+        wait: true
+        wait_timeout: 10m
+
+    - name: Install Loki
+      kubernetes.core.helm:
+        name: loki
+        chart_ref: grafana/loki
+        chart_version: "{{ loki_chart_version }}"
+        release_namespace: monitoring
+        values: "{{ lookup('ansible.builtin.file', 'loki-values.yaml') | from_yaml }}"
+        wait: true
+        wait_timeout: 10m
+
+    - name: Install Alloy
+      kubernetes.core.helm:
+        name: alloy
+        chart_ref: grafana/alloy
+        chart_version: "{{ alloy_chart_version }}"
+        release_namespace: monitoring
+        values: "{{ lookup('ansible.builtin.file', 'alloy-values.yaml') | from_yaml }}"
+        wait: true
+        wait_timeout: 5m
+
+    - name: Add the OOMKilled alert rule
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('ansible.builtin.file', 'prometheus-rule-oom.yaml') | from_yaml }}"

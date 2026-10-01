@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-oom
+  namespace: monitoring
+spec:
+  groups:
+    - name: homelab.oom
+      rules:
+        # Both metrics: a Job pod with restartPolicy Never stays in its first
+        # terminated state, while a restarting pod only reports the last one.
+        - alert: ContainerOOMKilled
+          expr: |
+            max by (namespace, pod, container) (
+              kube_pod_container_status_terminated_reason{reason="OOMKilled"} == 1
+              or
+              kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+            )
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }}: container {{ $labels.container }} was OOMKilled"

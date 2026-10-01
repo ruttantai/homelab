@@ -64,3 +64,26 @@
       ansible.builtin.uri:
         url: "http://{{ server_ip }}/api/health"
         status_code: 200
+
+- name: Verify monitoring
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Grafana is healthy behind /grafana
+      ansible.builtin.uri:
+        url: "http://{{ server_ip }}/grafana/api/health"
+        status_code: 200
+
+    - name: Loki is ready
+      ansible.builtin.command: kubectl get --raw /api/v1/namespaces/monitoring/services/loki:3100/proxy/ready
+      changed_when: false
+
+    - name: Read Prometheus rules
+      ansible.builtin.command: kubectl get --raw /api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy/api/v1/rules
+      register: verify_rules
+      changed_when: false
+
+    - name: The OOM alert rule is loaded
+      ansible.builtin.assert:
+        that: "'ContainerOOMKilled' in verify_rules.stdout"

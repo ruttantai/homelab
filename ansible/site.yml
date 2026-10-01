@@ -21,4 +21,5 @@
   become: true
   roles:
     - k8s_tooling
+    - monitoring
     - ley_khaa
