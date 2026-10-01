@@ -30,4 +30,14 @@ resource "local_file" "inventory" {
     agents          = { for n, r in var.nodes : n => multipass_instance.node[n].ipv4 if r == "agent" }
     ssh_private_key = local.ssh_private_key
   })
+
+  # Multipass 1.16 has been observed handing two concurrently launched VMs the same MAC address,
+  # which collides them onto the same DHCP-leased IP. Fail loudly instead of writing a broken
+  # inventory that silently points two hostnames at one address.
+  lifecycle {
+    precondition {
+      condition     = length(distinct(values({ for n, i in multipass_instance.node : n => i.ipv4 }))) == length(var.nodes)
+      error_message = "Multipass assigned duplicate IPs to two or more nodes; run `make down` and retry."
+    }
+  }
 }

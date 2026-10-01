@@ -21,9 +21,11 @@ prereqs:
 keys:
 	test -f $(SSH_KEY) || ssh-keygen -q -t ed25519 -N '' -C homelab -f $(SSH_KEY)
 
+# Multipass 1.16 gave two concurrently launched VMs the same MAC address (-> DHCP IP collision);
+# -parallelism=1 launches nodes one at a time to avoid it.
 infra: keys
 	$(TF) init -input=false
-	$(TF) apply -auto-approve -input=false
+	$(TF) apply -auto-approve -input=false -parallelism=1
 
 # Works even after a half-finished `up`: destroy only touches what state records.
 down:
