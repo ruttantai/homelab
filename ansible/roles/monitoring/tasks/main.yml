@@ -12,6 +12,37 @@
         - { name: prometheus-community, url: "https://prometheus-community.github.io/helm-charts" }
         - { name: grafana, url: "https://grafana.github.io/helm-charts" }
 
+    - name: Create the monitoring namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: monitoring
+
+    # Kept out of helm values entirely: kubernetes.core.helm would otherwise echo
+    # it back in status.values, and Ansible would echo module_args (including the
+    # password) if this task ever failed. no_log here is safe (unlike on the helm
+    # task below) because a Secret apply either succeeds or fails on its own,
+    # with nothing else in this task worth seeing on failure.
+    - name: Create the Grafana admin Secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          type: Opaque
+          metadata:
+            name: grafana-admin
+            namespace: monitoring
+          data:
+            admin-user: "{{ 'admin' | b64encode }}"
+            admin-password: >-
+              {{ lookup('ansible.builtin.password', secrets_dir ~ '/grafana-admin',
+              chars=['ascii_letters', 'digits'], length=24) | b64encode }}
+      no_log: true
+
     - name: Install kube-prometheus-stack
       kubernetes.core.helm:
         name: kps
@@ -19,7 +50,7 @@
         chart_version: "{{ kube_prometheus_stack_version }}"
         release_namespace: monitoring
         create_namespace: true
-        values: "{{ lookup('ansible.builtin.template', 'kps-values.yaml.j2') | from_yaml }}"
+        values: "{{ lookup('ansible.builtin.file', 'kps-values.yaml') | from_yaml }}"
         wait: true
         wait_timeout: 10m
 

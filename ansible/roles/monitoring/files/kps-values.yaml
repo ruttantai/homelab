@@ -2,7 +2,13 @@
 fullnameOverride: kps
 
 grafana:
-  adminPassword: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/grafana-admin', chars=['ascii_letters', 'digits'], length=24) }}"
+  # Credentials come from the pre-created grafana-admin Secret (see tasks/main.yml),
+  # never from values: helm would otherwise echo the password in status.values,
+  # and Ansible would echo it in module_args on any failure of this task.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
   grafana.ini:
     server:
       root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
