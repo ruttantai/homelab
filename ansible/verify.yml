@@ -73,7 +73,20 @@
     - name: Grafana is healthy behind /grafana
       ansible.builtin.uri:
         url: "http://{{ server_ip }}/grafana/api/health"
+        return_content: true
         status_code: 200
+      register: verify_grafana
+
+    # ley-khaa's own ingress answers 200 with its SPA for any unmatched path
+    # (including /grafana if routing regresses), so status_code alone can't
+    # tell them apart. verify_grafana.json is only populated by the uri module
+    # when the body actually parses as JSON, so an SPA HTML response fails
+    # this assert cleanly instead of erroring on the next line.
+    - name: The response is Grafana's own health JSON, not ley-khaa's SPA
+      ansible.builtin.assert:
+        that:
+          - verify_grafana.json is defined
+          - verify_grafana.json.database == 'ok'
 
     - name: Loki is ready
       ansible.builtin.command: kubectl get --raw /api/v1/namespaces/monitoring/services/loki:3100/proxy/ready
