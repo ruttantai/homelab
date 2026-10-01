@@ -55,8 +55,9 @@ homelab/
 │   ├── ansible.cfg
 │   ├── site.yml
 │   ├── requirements.yml          pinned collections (kubernetes.core, community.general, ansible.posix)
-│   ├── group_vars/all.yml        pinned versions (k3s, charts, ley-khaa image tag)
-│   └── roles/{common,k3s_server,k3s_agent,monitoring,ley_khaa}/
+│   ├── group_vars/all.yml        pinned versions (k3s, Helm, charts, kubernetes lib)
+│   ├── verify.yml                assertions run by `make verify` / `make test`
+│   └── roles/{common,k3s_server,k3s_agent,k8s_tooling,monitoring,ley_khaa}/
 ├── k8s/
 │   ├── ley-khaa/                 kustomization: namespace, postgres, backend, frontend, ingress
 │   └── demo/oom-job.yaml
@@ -92,13 +93,17 @@ Roles are idempotent: a second `ansible-playbook site.yml` run reports `changed=
   Alertmanager, Grafana, kube-state-metrics) and `loki` (single-binary mode, filesystem storage) + `alloy` (log shipper;
   replaces Promtail, which Grafana deprecated in 2025). Pinned: kube-prometheus-stack 91.8.2, loki 7.3.0, alloy 1.13.0.
   Grafana served at `/grafana` through Traefik with Loki pre-wired as a datasource. One extra PrometheusRule:
-  `ContainerOOMKilled` on `kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1`.
+  `ContainerOOMKilled` on `kube_pod_container_status_terminated_reason{reason="OOMKilled"} == 1` OR the
+  `last_terminated_reason` variant. Both are needed: a Job pod with `restartPolicy: Never` stays in its first
+  terminated state and never gets a "last" state, while a restarting Deployment pod only shows the "last" one.
   Admin password generated once on the Mac (`.secrets/grafana-admin`, git-ignored) and printed by `make up`.
+- **k8s_tooling (cp-1 only):** installs what the next two roles need on cp-1.
 - **Where the Kubernetes tasks run:** the monitoring and ley_khaa roles run **on cp-1**, not on the Mac, using k3s's
   own kubeconfig. cp-1 gets Helm v3.22.0 (Helm 3, not 4, for `kubernetes.core` compatibility) and a venv at
   `/opt/homelab-venv` with `kubernetes==36.0.3` for the `kubernetes.core` modules. The Mac needs only Ansible, not a
   Kubernetes Python stack. Manifests are copied to cp-1 and applied with `k3s kubectl apply -k`.
-- **ley_khaa:** `kubernetes.core.k8s` applies the kustomize output of `k8s/ley-khaa/`, then waits for rollouts.
+- **ley_khaa:** creates the `ley-khaa-db` Secret with `kubernetes.core.k8s`, applies `k8s/ley-khaa/` with
+  `k3s kubectl apply -k`, then waits for rollouts.
 
 ## 6. ley-khaa on the cluster
 
@@ -114,7 +119,8 @@ Roles are idempotent: a second `ansible-playbook site.yml` run reports `changed=
 - **frontend:** Deployment, image `ghcr.io/ruttantai/ley-khaa-frontend:<tag>`; nginx on 8080.
 - **ingress (Traefik):** `/` → frontend. The frontend's nginx proxies `/api/` → `backend:8000/`, so the browser
   only ever talks to one origin.
-- Image tag is pinned in `group_vars/all.yml`, never `latest`.
+- Image tag is pinned once, in `k8s/ley-khaa/kustomization.yaml` (`images:`), never `latest`; Ansible and the CI smoke
+  test both read it from there.
 
 **Why subprocess sandbox and heuristic LLM:** k3s runs containerd, so there is no Docker socket for `DockerSandbox`;
 and no API key should live in a demo cluster. ley-khaa's manifest records `sandbox: subprocess` and the heuristic
