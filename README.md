@@ -50,4 +50,4 @@ Needs about 9 GB free RAM (three 3 GB VMs).
   `make test` runs end to end in about 7 minutes: three fresh VMs, the full Ansible run, an idempotency re-run,
   `verify`, the OOM demo, then teardown.
 
-Design spec: `docs/superpowers/specs/2026-10-01-homelab-design.md`.
+Design spec: `docs/design.md`.
