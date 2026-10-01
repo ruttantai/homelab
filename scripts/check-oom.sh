@@ -7,6 +7,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+: "${KUBECONFIG:=$HOME/.kube/homelab.yaml}"
+export KUBECONFIG
+
 prom=/api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy
 loki=/api/v1/namespaces/monitoring/services/loki:3100/proxy
 

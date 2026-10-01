@@ -25,7 +25,7 @@
         that:
           - "'Status: active' in verify_ufw.stdout"
           - "'deny (incoming)' in verify_ufw.stdout"
-          - "'10.42.0.0/16' in verify_ufw.stdout"
+          - "'{{ k3s_pod_cidr }}' in verify_ufw.stdout"
 
 - name: Verify the cluster
   hosts: localhost
@@ -89,11 +89,15 @@
           - verify_grafana.json.database == 'ok'
 
     - name: Loki is ready
-      ansible.builtin.command: kubectl get --raw /api/v1/namespaces/monitoring/services/loki:3100/proxy/ready
+      ansible.builtin.command: >-
+        kubectl --kubeconfig {{ lookup('env', 'HOME') }}/.kube/homelab.yaml
+        get --raw /api/v1/namespaces/monitoring/services/loki:3100/proxy/ready
       changed_when: false
 
     - name: Read Prometheus rules
-      ansible.builtin.command: kubectl get --raw /api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy/api/v1/rules
+      ansible.builtin.command: >-
+        kubectl --kubeconfig {{ lookup('env', 'HOME') }}/.kube/homelab.yaml
+        get --raw /api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy/api/v1/rules
       register: verify_rules
       changed_when: false
 

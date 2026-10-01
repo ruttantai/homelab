@@ -49,10 +49,9 @@
         chart_ref: prometheus-community/kube-prometheus-stack
         chart_version: "{{ kube_prometheus_stack_version }}"
         release_namespace: monitoring
-        create_namespace: true
         values: "{{ lookup('ansible.builtin.file', 'kps-values.yaml') | from_yaml }}"
         wait: true
-        wait_timeout: 10m
+        timeout: 10m
 
     - name: Install Loki
       kubernetes.core.helm:
@@ -62,7 +61,7 @@
         release_namespace: monitoring
         values: "{{ lookup('ansible.builtin.file', 'loki-values.yaml') | from_yaml }}"
         wait: true
-        wait_timeout: 10m
+        timeout: 10m
 
     - name: Install Alloy
       kubernetes.core.helm:
@@ -72,7 +71,7 @@
         release_namespace: monitoring
         values: "{{ lookup('ansible.builtin.file', 'alloy-values.yaml') | from_yaml }}"
         wait: true
-        wait_timeout: 5m
+        timeout: 5m
 
     - name: Add the OOMKilled alert rule
       kubernetes.core.k8s:

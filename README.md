@@ -25,7 +25,7 @@ brew install multipass ansible ansible-lint yamllint kubectl jq kubeconform k3d 
 make up         # prints the ley-khaa and Grafana URLs
 make oom-demo   # a pod is OOMKilled, an alert fires, and its logs are still in Loki after it's gone
 make status
-make down       # deletes every VM
+make down       # deletes the lab's three VMs
 make test       # all of the above from scratch, plus an idempotency re-run; KEEP=1 keeps the cluster
 ```
 

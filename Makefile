@@ -27,11 +27,13 @@ infra: keys
 	$(TF) init -input=false
 	$(TF) apply -auto-approve -input=false -parallelism=1
 
-# Works even after a half-finished `up`: destroy only touches what state records.
+# terraform destroy only touches what state records; the loop below also removes
+# cp-1/worker-1/worker-2 (names mirror var.nodes in terraform/variables.tf) even
+# when Terraform's state lost track of them, without touching any other VM.
 down:
 	$(TF) init -input=false >/dev/null
 	$(TF) destroy -auto-approve -input=false
-	multipass purge
+	for n in cp-1 worker-1 worker-2; do multipass delete --purge $$n >/dev/null 2>&1 || true; done
 
 lint:
 	yamllint .
