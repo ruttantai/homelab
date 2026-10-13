@@ -33,6 +33,16 @@ jobs:
           kubectl kustomize k8s/ley-khaa | "$RUNNER_TEMP/kubeconform" -strict -summary -
           "$RUNNER_TEMP/kubeconform" -strict -summary k8s/demo
 
+  power-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r power-api/requirements-dev.txt
+      - run: pytest -q power-api/tests
+
   smoke:
     needs: static
     runs-on: ubuntu-latest

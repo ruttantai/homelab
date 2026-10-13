@@ -10,7 +10,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -44,6 +44,12 @@ lint:
 	cd ansible && ansible-lint
 	set -o pipefail; kubectl kustomize k8s/ley-khaa | kubeconform -strict -summary -
 	kubeconform -strict -summary k8s/demo
+	$(MAKE) power-api-test
+
+# The power API is stdlib-only; pytest is a test-time dependency, kept in its own venv.
+power-api-test:
+	test -x .venv/bin/pytest || { python3 -m venv .venv && .venv/bin/pip install -q -r power-api/requirements-dev.txt; }
+	.venv/bin/pytest -q power-api/tests
 
 # --force: the full "ansible" package (vs. ansible-core) bundles its own copies of
 # community.general/ansible.posix: without --force, ansible-galaxy sees a version-

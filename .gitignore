@@ -12,3 +12,7 @@ ansible/collections/
 .DS_Store
 # Agent workspace (plans, reviews); never committed.
 .superpowers/
+# Local venv for the power API tests.
+.venv/
+__pycache__/
+.pytest_cache/
