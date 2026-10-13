@@ -12,7 +12,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency power-api-token power-api-start power-api-stop hpc-hold hpc-release elastic-demo hpc-up
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -49,6 +49,9 @@ lint:
 	cd ansible && ansible-lint
 	set -o pipefail; kubectl kustomize k8s/ley-khaa | kubeconform -strict -summary -
 	kubeconform -strict -summary k8s/demo
+	shellcheck scripts/*.sh ansible/roles/slurm_power/files/slurm-power
+	scripts/test-slurm-power.sh
+	scripts/test-hpc-lib.sh
 	$(MAKE) power-api-test
 
 # The power API is stdlib-only; pytest is a test-time dependency, kept in its own venv.
@@ -99,11 +102,13 @@ hpc-infra: keys
 	$(TF_HPC) apply -auto-approve -input=false -parallelism=1
 
 hpc-down:
+	scripts/power-api.sh stop
 	$(TF_HPC) init -input=false >/dev/null
 	$(TF_HPC) destroy -auto-approve -input=false
 	for n in $(HPC_VMS); do multipass delete --purge $$n >/dev/null 2>&1 || true; done
 
-hpc-configure: collections
+# The hold step wakes powered-off nodes through the power API, so it must be running (Review Focus 5).
+hpc-configure: collections power-api-start
 	scripts/hpc-run.sh configure
 
 hpc-verify: collections
@@ -111,3 +116,23 @@ hpc-verify: collections
 
 hpc-idempotency: collections
 	scripts/hpc-run.sh idempotency
+
+power-api-token:
+	test -s .secrets/power-api.token || { umask 077; mkdir -p .secrets; openssl rand -hex 32 > .secrets/power-api.token; }
+
+power-api-start: power-api-token
+	scripts/power-api.sh start
+
+power-api-stop:
+	scripts/power-api.sh stop
+
+hpc-hold:
+	scripts/hpc-hold.sh hold
+
+hpc-release:
+	scripts/hpc-hold.sh release
+
+elastic-demo:
+	scripts/check-elastic.sh
+
+hpc-up: prereqs hpc-infra power-api-start hpc-configure

@@ -12,6 +12,10 @@
     - munge
     - nfs
     - slurm_common
+    # Before the end-of-play restart of slurmctld: it checks SuspendProgram/ResumeProgram once at
+    # startup and turns power saving off for good if they are missing.
+    - role: slurm_power
+      when: inventory_hostname in groups['hpc_head']
     - lmod
 
 - name: Compute nodes

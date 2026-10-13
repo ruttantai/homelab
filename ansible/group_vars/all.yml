@@ -33,8 +33,9 @@ slurm_srun_ports: "60001-60100"
 slurm_node_cpus: 2
 slurm_node_realmem: 1200
 slurm_suspend_time: 120
-# Task 6 turns power saving on once the resume/suspend hooks exist.
-slurm_power_enabled: false
+# Elastic nodes on (spec §5). The hooks are installed before slurmctld starts (site-hpc.yml).
+slurm_power_enabled: true
+power_api_port: 8765
 
 spack_version: v1.2.2
 spack_packages: ["gsl@2.8"]

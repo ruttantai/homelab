@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Slurm power-saving hook (spec §5.2). Installed as slurm-resume and slurm-suspend; the name it is
+# called by picks the action. Slurm passes one argument, a host list such as hpc-node-[1-2], and runs
+# it as SlurmUser. The token is read by curl from a header file, so it never shows up in `ps`.
+set -euo pipefail
+
+POWER_ENV=${POWER_ENV:-/etc/slurm/power-api.env}
+HEADER_FILE=${HEADER_FILE:-/etc/slurm/power-api.header}
+LOG=${POWER_LOG:-/var/log/slurm/power.log}
+RESUME_TIMEOUT=${RESUME_TIMEOUT:-300}
+
+case "$(basename "$0")" in
+  slurm-resume) action=resume ;;
+  slurm-suspend) action=suspend ;;
+  *) echo "call as slurm-resume or slurm-suspend" >&2; exit 2 ;;
+esac
+
+log() { printf '%s %s %s\n' "$(date -u +%FT%TZ)" "$action" "$*" >>"$LOG"; }
+
+# shellcheck source=/dev/null
+. "$POWER_ENV"
+: "${POWER_API_URL:?POWER_API_URL missing from $POWER_ENV}"
+
+api() { # METHOD PATH NODE -> response body; any non-2xx is an error
+  curl -fsS --max-time 180 -X "$1" -H "@$HEADER_FILE" "$POWER_API_URL$2?node=$3"
+}
+
+[ $# -eq 1 ] || { log "expected one host list, got $#"; exit 2; }
+
+rc=0
+for n in $(scontrol show hostnames "$1"); do
+  if [ "$action" = suspend ]; then
+    if api POST /stop "$n" >/dev/null 2>>"$LOG"; then log "$n stopped"; else log "$n stop FAILED"; rc=1; fi
+    continue
+  fi
+
+  if ! api POST /start "$n" >/dev/null 2>>"$LOG"; then log "$n start FAILED"; rc=1; continue; fi
+  # Leave Slurm 30 s of its ResumeTimeout for slurmd to register after we hand over.
+  deadline=$((SECONDS + RESUME_TIMEOUT - 30))
+  ip=""
+  while [ -z "$ip" ] && [ "$SECONDS" -lt "$deadline" ]; do
+    ip=$(api GET /ip "$n" 2>>"$LOG" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("ip") or "")' || true)
+    [ -n "$ip" ] || sleep 3
+  done
+  if [ -z "$ip" ]; then log "$n has no IP after start"; rc=1; continue; fi
+  # Multipass may lease a different address after a restart (spec §9).
+  scontrol update NodeName="$n" NodeAddr="$ip" NodeHostname="$n"
+  log "$n started at $ip"
+done
+exit "$rc"
