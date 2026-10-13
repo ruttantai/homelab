@@ -12,7 +12,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -102,3 +102,12 @@ hpc-down:
 	$(TF_HPC) init -input=false >/dev/null
 	$(TF_HPC) destroy -auto-approve -input=false
 	for n in $(HPC_VMS); do multipass delete --purge $$n >/dev/null 2>&1 || true; done
+
+hpc-configure: collections
+	scripts/hpc-run.sh configure
+
+hpc-verify: collections
+	scripts/hpc-run.sh verify
+
+hpc-idempotency: collections
+	scripts/hpc-run.sh idempotency

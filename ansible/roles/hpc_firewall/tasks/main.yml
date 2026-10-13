@@ -1,0 +1,18 @@
+# Opened to the HPC subnet only (spec §10.2, §10.5). slurmd and srun's call-back ports are needed on
+# every node (a batch script can run srun on a compute node); the rest only on the head.
+- name: Allow slurmd and srun call-backs from the HPC subnet
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ hpc_subnet }}"
+  loop: ["6818", "{{ slurm_srun_ports | replace('-', ':') }}"]
+
+- name: Allow slurmctld, NFS and the Slurm exporter on the head
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ hpc_subnet }}"
+  loop: ["6817", "2049", "9092"]
+  when: inventory_hostname in groups['hpc_head']

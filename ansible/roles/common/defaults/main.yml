@@ -1,0 +1,3 @@
+# The k3s stack needs HTTP, the API server, kubelet, flannel and the pod/service CIDRs open.
+# site-hpc.yml sets this false: the HPC nodes run no Kubernetes.
+common_k3s_rules: true

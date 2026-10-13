@@ -1,0 +1,11 @@
+# Slurm and NFS refer to nodes by name; there is no DNS in the lab. The resume hook (spec §5.2)
+# corrects a compute node's address in slurmctld if it changes after a restart.
+- name: Name every HPC node in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s{{ item }}$'
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ groups['hpc'] }}"
