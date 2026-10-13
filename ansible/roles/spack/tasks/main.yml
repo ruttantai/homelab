@@ -1,0 +1,53 @@
+- name: Install what Spack needs to build
+  ansible.builtin.apt:
+    name: [git, python3, unzip, bzip2, xz-utils, file, patch, curl, gfortran]
+    state: present
+
+- name: Clone Spack
+  ansible.builtin.git:
+    repo: https://github.com/spack/spack.git
+    dest: "{{ spack_root }}"
+    version: "{{ spack_version }}"
+    depth: 1
+    single_branch: true
+
+- name: Configure Spack's modules
+  ansible.builtin.copy:
+    src: modules.yaml
+    dest: "{{ spack_root }}/etc/spack/modules.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  register: spack_modules_config
+
+- name: Register the system compiler
+  ansible.builtin.command: "{{ spack_root }}/bin/spack compiler find"
+  register: spack_compiler
+  changed_when: "'Added' in spack_compiler.stdout"
+
+# Builds take minutes on 2 vCPUs; async keeps the SSH session from timing out.
+- name: Build the packages
+  ansible.builtin.shell: |
+    set -o pipefail
+    if {{ spack_root }}/bin/spack find {{ item }} >/dev/null 2>&1; then
+      echo present
+    else
+      {{ spack_root }}/bin/spack install -j2 {{ item }}
+    fi
+  args:
+    executable: /bin/bash
+  loop: "{{ spack_packages }}"
+  register: spack_install
+  changed_when: "'present' not in spack_install.stdout"
+  async: 3600
+  poll: 30
+
+- name: Check for generated modulefiles
+  ansible.builtin.stat:
+    path: "{{ spack_root }}/share/spack/modules"
+  register: spack_modules_dir
+
+- name: Generate modulefiles
+  ansible.builtin.command: "{{ spack_root }}/bin/spack module tcl refresh -y"
+  when: spack_install is changed or spack_modules_config is changed or not spack_modules_dir.stat.exists
+  changed_when: true

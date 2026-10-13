@@ -112,3 +112,24 @@
     - name: Slurm killed it for memory (the Slurm side of the OOM story)
       ansible.builtin.assert:
         that: verify_oom_state.stdout is search('JobState=OUT_OF_MEMORY')
+
+    - name: Put the GSL test program on shared storage
+      ansible.builtin.copy:
+        src: files/bessel.c
+        dest: "{{ verify_dir }}/bessel.c"
+        mode: "0644"
+
+    - name: Compile and run it on a compute node with the Spack-built module
+      ansible.builtin.command:
+        cmd: >-
+          srun -N1 -w {{ groups['hpc_compute'][0] }} bash -lc
+          'module load gsl && gcc -o bessel bessel.c $(pkg-config --cflags --libs gsl)
+          -Wl,-rpath,$(pkg-config --variable=libdir gsl) && ./bessel'
+        chdir: "{{ verify_dir }}"
+      register: verify_gsl
+      changed_when: false
+
+    # 14 significant digits: the GSL manual's printout and GSL 2.8 differ in the 16th.
+    - name: The module's library gives J0(5) correctly
+      ansible.builtin.assert:
+        that: "'J0(5) = -1.7759677131433' in verify_gsl.stdout"

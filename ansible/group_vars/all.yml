@@ -35,3 +35,6 @@ slurm_node_realmem: 1200
 slurm_suspend_time: 120
 # Task 6 turns power saving on once the resume/suspend hooks exist.
 slurm_power_enabled: false
+
+spack_version: v1.2.2
+spack_packages: ["gsl@2.8"]

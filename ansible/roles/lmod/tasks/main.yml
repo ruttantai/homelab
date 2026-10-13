@@ -1,0 +1,13 @@
+# build-essential and pkg-config: users compile against modules on the compute nodes.
+- name: Install Lmod and a compiler toolchain
+  ansible.builtin.apt:
+    name: [lmod, build-essential, pkg-config]
+    state: present
+
+- name: Put Spack's modules on every login shell's MODULEPATH
+  ansible.builtin.copy:
+    src: z00-spack-modules.sh
+    dest: /etc/profile.d/z00-spack-modules.sh
+    owner: root
+    group: root
+    mode: "0644"

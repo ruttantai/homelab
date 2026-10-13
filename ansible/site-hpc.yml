@@ -12,6 +12,7 @@
     - munge
     - nfs
     - slurm_common
+    - lmod
 
 - name: Compute nodes
   hosts: hpc_compute
@@ -26,3 +27,4 @@
   become: true
   roles:
     - slurm_head
+    - spack
