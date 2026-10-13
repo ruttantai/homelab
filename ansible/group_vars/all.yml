@@ -28,3 +28,10 @@ hpc_shared_export: /srv/shared
 hpc_shared_dir: /shared
 spack_root: /opt/spack
 slurm_srun_ports: "60001-60100"
+
+# Must match terraform/hpc/variables.tf (cpus=2, memory=1536M); RealMemory leaves room for the OS.
+slurm_node_cpus: 2
+slurm_node_realmem: 1200
+slurm_suspend_time: 120
+# Task 6 turns power saving on once the resume/suspend hooks exist.
+slurm_power_enabled: false

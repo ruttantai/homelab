@@ -29,6 +29,11 @@
     mode: "0400"
   notify: Restart munge
 
+# Restart now, not at the end of the play: if a later task fails on this host its handlers are
+# skipped, and munge would keep the old key while the next run sees nothing to change.
+- name: Load a new munge key before anything else can fail
+  ansible.builtin.meta: flush_handlers
+
 - name: Run munge
   ansible.builtin.systemd_service:
     name: munge

@@ -1,0 +1,27 @@
+- name: Create the slurmd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/slurmd.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# A compute node must not register before its shared storage is there (spec §5.2 boot order).
+- name: Order slurmd after the NFS mounts and munge
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/slurmd.service.d/10-homelab.conf
+    content: |
+      [Unit]
+      RequiresMountsFor={{ hpc_shared_dir }} {{ spack_root }}
+      After=munge.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: slurm_node_dropin
+
+- name: Run slurmd
+  ansible.builtin.systemd_service:
+    name: slurmd
+    enabled: true
+    state: started
+    daemon_reload: "{{ slurm_node_dropin is changed }}"

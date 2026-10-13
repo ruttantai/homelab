@@ -11,3 +11,18 @@
     - hpc_firewall
     - munge
     - nfs
+    - slurm_common
+
+- name: Compute nodes
+  hosts: hpc_compute
+  become: true
+  roles:
+    - slurm_node
+
+# No play after this one targets the compute nodes, so once slurmctld can power them off
+# (Task 6) nothing later in the run needs to reach them (spec §10.4).
+- name: Head node
+  hosts: hpc_head
+  become: true
+  roles:
+    - slurm_head
