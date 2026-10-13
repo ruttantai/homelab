@@ -1,6 +1,6 @@
 # HPC stack: an elastic Slurm cluster beside the k3s lab — design
 
-*Agreed in conversation 2026-10-12; this file awaits review.*
+*Agreed 2026-10-12; implemented on feature/hpc-slurm.*
 
 ## 1. Purpose
 
@@ -184,6 +184,26 @@ playbook) → `hpc-verify` → `elastic-demo` → `hpc-down`. `KEEP=1` skips tea
   fallback is the previous exporter release, decided then and recorded here.
 - **Bridge interface name** (`bridge100`) differs on some hosts. The start target fails with a clear message rather
   than binding wider.
+
+**Risks that occurred during implementation (2026-10-13), and what was done:**
+
+- **Handler ordering on a fresh build (three times).** Handlers run at the end of a play, after later roles. `nfs`:
+  apt starts nfs-server before `/etc/exports` exists, so computes got "access denied" (fixed: `flush_handlers` before
+  the compute mounts). `slurm_common`: slurmctld restarted before its state directory existed (fixed: created in
+  `slurm_common`). Power hooks: slurmctld checked `SuspendProgram` at that restart, found nothing, and turned power
+  saving off for good (fixed: `slurm_power` runs in the first play). Plus `munge`: a host that failed later in its
+  first run skipped the key-restart handler (fixed: `flush_handlers` right after the key).
+- **`multipass exec` hangs on macOS** when its stdout is not a terminal or pipe, or the remote command prints nothing.
+  The scripts talk to `hpc-head` over SSH instead (`scripts/hpc-lib.sh`).
+- **cloud-init rewrites `/etc/hosts` on every boot** (Multipass enables `manage_etc_hosts`), and elastic nodes boot
+  often. `hpc_hosts` also writes the names into `/etc/cloud/templates/hosts.debian.tmpl`.
+- **A new power-API token deadlocked configure**: the hold step could not wake nodes while the head still had the old
+  token. `hpc-hold.sh` now pushes the hook settings (`ansible/hpc-power-hook.yml`) before waking anything, and
+  `hpc-configure` starts the API itself.
+- **POWER_UP edge cases**: refused while a node is still powering down; and on an already-running node it starts a
+  power-up that waits for a reboot. The hold step re-requests it, only for nodes in a powered-off (`~`) state.
+- Exporter compatibility: no problem; label values were read from the live exporter and pinned in a promtool test.
+  Spack/GSL memory: no problem on the 2 GiB head.
 
 ## 10. Revisions made while planning (2026-10-12)
 

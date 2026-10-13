@@ -232,3 +232,15 @@ containing a pipe starts with `set -o pipefail;` so a failure upstream of the pi
 Only what `make test` has verified on this Mac: Terraform-provisioned VMs, Ansible roles for hardening and k3s,
 Helm-installed Prometheus/Grafana/Loki, a containerised app deployed to Kubernetes from GHCR, multi-arch image
 release via GitHub Actions, and a reproducible OOMKilled-to-logs investigation.
+
+## 12. HPC stack
+
+A second, independent stack added on `feature/hpc-slurm`: an elastic Slurm cluster beside the k3s lab. Design:
+`docs/superpowers/specs/2026-10-12-hpc-slurm-design.md`; plan: `docs/superpowers/plans/2026-10-12-hpc-slurm.md`.
+
+What shipped: `terraform/hpc/` (own state; `hpc-head` + two computes; mocked `terraform test`), `ansible/site-hpc.yml`
+(hardening without the k3s rules, `/etc/hosts`, subnet firewall, munge, NFS `/shared` and read-only `/opt/spack`,
+Slurm 23.11 with cgroup memory limits, Lmod + Spack-built GSL, power hooks, Slurm exporter), the power API
+(`power-api/server.py`, stdlib, pytest), elastic nodes via Slurm power saving, Slurm metrics, alerts (promtool-tested)
+and a dashboard in the k3s Prometheus/Grafana, and `make hpc-test` end to end.
+

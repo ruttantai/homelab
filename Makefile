@@ -12,10 +12,10 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency power-api-token power-api-start power-api-stop hpc-hold hpc-release elastic-demo hpc-up hpc-monitoring hpc-monitoring-verify
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency power-api-token power-api-start power-api-stop hpc-hold hpc-release elastic-demo hpc-up hpc-monitoring hpc-monitoring-verify hpc-test
 
 help:
-	@echo "make up | down | test | oom-demo | status | lint | prereqs"
+	@echo "make up | down | test | oom-demo | status | lint | prereqs | hpc-up | hpc-down | hpc-test | elastic-demo | hpc-monitoring"
 
 prereqs:
 	@for t in multipass terraform ansible-playbook kubectl jq; do command -v $$t >/dev/null || { echo "missing: $$t (see README)"; exit 1; }; done; echo "prereqs ok"
@@ -146,3 +146,7 @@ hpc-monitoring: collections
 
 hpc-monitoring-verify: collections
 	cd ansible && ansible-playbook -i inventory/hosts.yml -i inventory/hpc.yml verify-hpc-monitoring.yml
+
+# Clean HPC build -> verify -> elastic demo -> idempotency (nodes off) -> teardown. KEEP=1 keeps the VMs.
+hpc-test:
+	KEEP=$(KEEP) scripts/hpc-test.sh
