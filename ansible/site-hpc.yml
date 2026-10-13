@@ -1,0 +1,35 @@
+# The HPC stack (spec docs/superpowers/specs/2026-10-12-hpc-slurm-design.md). Run through
+# scripts/hpc-run.sh (make hpc-configure), never directly: it holds Slurm's power saving first.
+- name: HPC baseline on every node
+  hosts: hpc
+  become: true
+  roles:
+    - role: common
+      vars:
+        common_k3s_rules: false
+    - hpc_hosts
+    - hpc_firewall
+    - munge
+    - nfs
+    - slurm_common
+    # Before the end-of-play restart of slurmctld: it checks SuspendProgram/ResumeProgram once at
+    # startup and turns power saving off for good if they are missing.
+    - role: slurm_power
+      when: inventory_hostname in groups['hpc_head']
+    - lmod
+
+- name: Compute nodes
+  hosts: hpc_compute
+  become: true
+  roles:
+    - slurm_node
+
+# No play after this one targets the compute nodes, so once slurmctld can power them off
+# (Task 6) nothing later in the run needs to reach them (spec §10.4).
+- name: Head node
+  hosts: hpc_head
+  become: true
+  roles:
+    - slurm_head
+    - spack
+    - slurm_exporter

@@ -1,0 +1,42 @@
+- name: Install the power hook
+  ansible.builtin.copy:
+    src: slurm-power
+    dest: /usr/local/sbin/slurm-power
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Link it as slurm-resume and slurm-suspend
+  ansible.builtin.file:
+    src: /usr/local/sbin/slurm-power
+    dest: /usr/local/sbin/{{ item }}
+    state: link
+  loop: [slurm-resume, slurm-suspend]
+
+- name: Tell the hook where the power API is
+  ansible.builtin.template:
+    src: power-api.env.j2
+    dest: /etc/slurm/power-api.env
+    owner: root
+    group: root
+    mode: "0644"
+
+# slurmctld runs the hook as SlurmUser, so slurm (and only slurm) can read the token.
+- name: Install the power API token as a curl header file
+  ansible.builtin.copy:
+    content: "Authorization: Bearer {{ lookup('ansible.builtin.file', secrets_dir ~ '/power-api.token') }}\n"
+    dest: /etc/slurm/power-api.header
+    owner: slurm
+    group: slurm
+    mode: "0400"
+  no_log: true
+
+- name: Create the power log
+  ansible.builtin.file:
+    path: /var/log/slurm/power.log
+    state: touch
+    owner: slurm
+    group: slurm
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve

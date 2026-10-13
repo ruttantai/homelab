@@ -1,0 +1,13 @@
+# Slurm and NFS refer to nodes by name; there is no DNS in the lab. The resume hook (spec §5.2)
+# corrects a compute node's address in slurmctld if it changes after a restart.
+# Multipass enables cloud-init's manage_etc_hosts, which rebuilds /etc/hosts from the template on
+# every boot, and elastic nodes boot often; so the names go in the template too.
+- name: Name every HPC node in /etc/hosts and in cloud-init's template for it
+  ansible.builtin.lineinfile:
+    path: "{{ item.0 }}"
+    regexp: '\s{{ item.1 }}$'
+    line: "{{ hostvars[item.1]['ansible_host'] }} {{ item.1 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ['/etc/hosts', '/etc/cloud/templates/hosts.debian.tmpl'] | product(groups['hpc']) | list }}"

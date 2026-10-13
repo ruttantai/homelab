@@ -1,0 +1,19 @@
+# Slurm alerts (spec §6). Plain rules file so promtool can test it; Ansible wraps it in a PrometheusRule.
+groups:
+  - name: homelab.slurm
+    rules:
+      # idle~ (powered down) is expected on an elastic cluster; only down/drain/fail mean trouble.
+      - alert: SlurmNodeUnavailable
+        expr: sum(slurm_node_count_per_state{state=~"(?i)(down|drain|fail).*"}) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} Slurm node(s) down or drained"
+      # The exporter reads squeue --states=all, so finished jobs count for MinJobAge (600 s).
+      - alert: SlurmJobsFailing
+        expr: sum(slurm_partition_job_state_total{state=~"(?i)(failed|out_of_memory|timeout|node_fail)"}) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} Slurm job(s) ended FAILED, OUT_OF_MEMORY, TIMEOUT or NODE_FAIL in the last 10 minutes"

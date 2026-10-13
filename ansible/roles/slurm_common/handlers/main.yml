@@ -1,0 +1,4 @@
+- name: Restart the Slurm daemon
+  ansible.builtin.systemd_service:
+    name: "{{ 'slurmctld' if inventory_hostname in groups['hpc_head'] else 'slurmd' }}"
+    state: restarted

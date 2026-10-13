@@ -1,0 +1,10 @@
+# Site-wide Spack module config (spec §10.10): flat Tcl modules named name/version, read by Lmod.
+modules:
+  default:
+    enable: [tcl]
+    tcl:
+      hash_length: 0
+      projections:
+        all: "{name}/{version}"
+      all:
+        autoload: direct

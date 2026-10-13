@@ -1,0 +1,41 @@
+- name: Install munge
+  ansible.builtin.apt:
+    name: munge
+    state: present
+
+# One key for the whole cluster, generated once on the Mac and kept in .secrets/ (git-ignored).
+- name: Generate the cluster munge key
+  ansible.builtin.command:
+    cmd: openssl rand -out {{ secrets_dir }}/munge.key 1024
+    creates: "{{ secrets_dir }}/munge.key"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Restrict the munge key on the Mac
+  ansible.builtin.file:
+    path: "{{ secrets_dir }}/munge.key"
+    mode: "0600"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Install the munge key
+  ansible.builtin.copy:
+    src: "{{ secrets_dir }}/munge.key"
+    dest: /etc/munge/munge.key
+    owner: munge
+    group: munge
+    mode: "0400"
+  notify: Restart munge
+
+# Restart now, not at the end of the play: if a later task fails on this host its handlers are
+# skipped, and munge would keep the old key while the next run sees nothing to change.
+- name: Load a new munge key before anything else can fail
+  ansible.builtin.meta: flush_handlers
+
+- name: Run munge
+  ansible.builtin.systemd_service:
+    name: munge
+    enabled: true
+    state: started

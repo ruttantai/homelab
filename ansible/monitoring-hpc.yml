@@ -1,0 +1,50 @@
+# Slurm into the k3s Prometheus and Grafana (spec §6, §10.9). Needs both stacks up:
+#   ansible-playbook -i inventory/hosts.yml -i inventory/hpc.yml monitoring-hpc.yml   (make hpc-monitoring)
+- name: Slurm monitoring
+  hosts: k3s_server
+  become: true
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ homelab_venv }}/bin/python"
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+  tasks:
+    - name: Scrape the Slurm exporter on hpc-head
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: monitoring.coreos.com/v1alpha1
+          kind: ScrapeConfig
+          metadata:
+            name: slurm
+            namespace: monitoring
+          spec:
+            jobName: slurm
+            scrapeInterval: 30s
+            staticConfigs:
+              - targets: ["{{ hpc_head_ip }}:{{ slurm_exporter_port }}"]
+
+    - name: Slurm alert rules
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: monitoring.coreos.com/v1
+          kind: PrometheusRule
+          metadata:
+            name: homelab-slurm
+            namespace: monitoring
+          spec: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../monitoring/slurm/slurm-rules.yaml') | from_yaml }}"
+
+    - name: Slurm dashboard (picked up by the Grafana sidecar)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: slurm-dashboard
+            namespace: monitoring
+            labels:
+              grafana_dashboard: "1"
+          data:
+            slurm-dashboard.json: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../monitoring/slurm/slurm-dashboard.json') }}"

@@ -1,0 +1,33 @@
+- name: Install Slurm
+  ansible.builtin.apt:
+    name: "{{ ['slurm-client', 'slurmctld'] if inventory_hostname in groups['hpc_head'] else ['slurm-client', 'slurmd'] }}"
+    state: present
+
+- name: Create the Slurm log directory
+  ansible.builtin.file:
+    path: /var/log/slurm
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+
+# Here, not in slurm_head: the restart handler below fires at the end of the first play,
+# before slurm_head runs, and slurmctld will not start without its state directory.
+- name: Create slurmctld's state directory
+  ansible.builtin.file:
+    path: /var/spool/slurmctld
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0750"
+  when: inventory_hostname in groups['hpc_head']
+
+- name: Write slurm.conf and cgroup.conf
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/slurm/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [slurm.conf, cgroup.conf]
+  notify: Restart the Slurm daemon

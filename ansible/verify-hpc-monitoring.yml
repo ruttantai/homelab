@@ -1,0 +1,44 @@
+- name: Verify Slurm monitoring
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubectl: kubectl --kubeconfig {{ lookup('env', 'HOME') }}/.kube/homelab.yaml
+    prom: /api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy
+  tasks:
+    - name: Read Prometheus targets
+      ansible.builtin.command: "{{ kubectl }} get --raw {{ prom }}/api/v1/targets"
+      register: verify_targets
+      changed_when: false
+      vars:
+        verify_slurm_targets: >-
+          {{ (verify_targets.stdout | from_json).data.activeTargets
+             | selectattr('labels.job', 'search', 'slurm') | map(attribute='health') | list }}
+      until: verify_slurm_targets == ['up']
+      retries: 12
+      delay: 10
+
+    - name: Read Prometheus rules
+      ansible.builtin.command: "{{ kubectl }} get --raw {{ prom }}/api/v1/rules"
+      register: verify_rules
+      changed_when: false
+
+    - name: Both Slurm alert rules are loaded
+      ansible.builtin.assert:
+        that:
+          - "'SlurmNodeUnavailable' in verify_rules.stdout"
+          - "'SlurmJobsFailing' in verify_rules.stdout"
+
+    - name: Find the dashboard in Grafana
+      ansible.builtin.uri:
+        url: "http://{{ server_ip }}/grafana/api/search?query=Slurm"
+        url_username: admin
+        url_password: "{{ lookup('ansible.builtin.file', secrets_dir ~ '/grafana-admin') }}"
+        force_basic_auth: true
+        return_content: true
+      register: verify_dash
+      no_log: true
+
+    - name: The Slurm dashboard is provisioned
+      ansible.builtin.assert:
+        that: verify_dash.json | selectattr('title', 'equalto', 'Slurm (homelab)') | list | length == 1

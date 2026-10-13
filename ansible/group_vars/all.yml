@@ -15,3 +15,31 @@ homelab_remote_dir: /opt/homelab
 # Generated once on the Mac by the password lookup, reused on every later run.
 secrets_dir: "{{ playbook_dir }}/../.secrets"
 server_ip: "{{ hostvars[groups['k3s_server'][0]]['ansible_host'] }}"
+
+# --- HPC stack (docs/superpowers/specs/2026-10-12-hpc-slurm-design.md) ---
+# Evaluated lazily, so the k3s playbooks never touch them.
+hpc_head: "{{ groups['hpc_head'][0] }}"
+hpc_head_ip: "{{ hostvars[hpc_head]['ansible_host'] }}"
+# Subnet rules, not per-IP: a restarted compute node can lease a new address (spec §10.2).
+hpc_subnet: >-
+  {{ hostvars[hpc_head]['ansible_facts']['default_ipv4']['network'] }}/{{
+     hostvars[hpc_head]['ansible_facts']['default_ipv4']['prefix'] }}
+hpc_shared_export: /srv/shared
+hpc_shared_dir: /shared
+spack_root: /opt/spack
+slurm_srun_ports: "60001-60100"
+
+# Must match terraform/hpc/variables.tf (cpus=2, memory=1536M); RealMemory leaves room for the OS.
+slurm_node_cpus: 2
+slurm_node_realmem: 1200
+slurm_suspend_time: 120
+# Elastic nodes on (spec §5). The hooks are installed before slurmctld starts (site-hpc.yml).
+slurm_power_enabled: true
+power_api_port: 8765
+
+spack_version: v1.2.2
+spack_packages: ["gsl@2.8"]
+
+slurm_exporter_version: "1.8.0"
+slurm_exporter_sha256: 38adb5e51df1c4fa43709e4f03cc9eb67264bd923eff63ef357b13a96d1a09ef
+slurm_exporter_port: 9092

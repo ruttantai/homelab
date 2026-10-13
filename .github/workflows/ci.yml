@@ -17,11 +17,24 @@ jobs:
       - run: terraform -chdir=terraform init -backend=false -input=false
       - run: terraform -chdir=terraform validate
       - run: terraform -chdir=terraform test
+      - run: terraform -chdir=terraform/hpc init -backend=false -input=false
+      - run: terraform -chdir=terraform/hpc validate
+      - run: terraform -chdir=terraform/hpc test
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install yamllint==1.38.0
       - run: yamllint .
+      - run: shellcheck scripts/*.sh ansible/roles/slurm_power/files/slurm-power
+      - run: scripts/test-slurm-power.sh
+      - run: scripts/test-hpc-lib.sh
+      - name: promtool
+        run: |
+          curl -sSL https://github.com/prometheus/prometheus/releases/download/v3.15.0/prometheus-3.15.0.linux-amd64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP" --strip-components=1 prometheus-3.15.0.linux-amd64/promtool
+          "$RUNNER_TEMP/promtool" check rules monitoring/slurm/slurm-rules.yaml
+          "$RUNNER_TEMP/promtool" test rules monitoring/slurm/slurm-rules.test.yaml
+          python3 -m json.tool monitoring/slurm/slurm-dashboard.json >/dev/null
       - run: pip install ansible-core==2.21.4 ansible-lint==26.9.0
       - run: ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
       - run: ansible-lint
@@ -32,6 +45,16 @@ jobs:
             | tar xz -C "$RUNNER_TEMP" kubeconform
           kubectl kustomize k8s/ley-khaa | "$RUNNER_TEMP/kubeconform" -strict -summary -
           "$RUNNER_TEMP/kubeconform" -strict -summary k8s/demo
+
+  power-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r power-api/requirements-dev.txt
+      - run: pytest -q power-api/tests
 
   smoke:
     needs: static

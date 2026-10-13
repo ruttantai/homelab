@@ -1,0 +1,8 @@
+# Refreshes the power hook's settings and token on hpc-head only. scripts/hpc-hold.sh runs this before
+# waking nodes, so a new .secrets/power-api.token reaches the hook first (Review Focus 5); otherwise the
+# wake-up is refused with 401 and the configure run that would fix the header never starts.
+- name: Power hook on the head
+  hosts: hpc_head
+  become: true
+  roles:
+    - slurm_power

@@ -1,0 +1,5 @@
+- name: Run slurmctld
+  ansible.builtin.systemd_service:
+    name: slurmctld
+    enabled: true
+    state: started

@@ -1,0 +1,48 @@
+- name: Download the exporter (checksum pinned)
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/rivosinc/prometheus-slurm-exporter/releases/download/v{{ slurm_exporter_version
+      }}/prometheus-slurm-exporter_linux_arm64.tar.gz
+    dest: /opt/slurm-exporter-{{ slurm_exporter_version }}.tar.gz
+    checksum: sha256:{{ slurm_exporter_sha256 }}
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the install directory
+  ansible.builtin.file:
+    path: /opt/slurm-exporter-{{ slurm_exporter_version }}
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Unpack it
+  ansible.builtin.unarchive:
+    src: /opt/slurm-exporter-{{ slurm_exporter_version }}.tar.gz
+    dest: /opt/slurm-exporter-{{ slurm_exporter_version }}
+    remote_src: true
+    creates: /opt/slurm-exporter-{{ slurm_exporter_version }}/prometheus-slurm-exporter
+
+- name: Link the binary
+  ansible.builtin.file:
+    src: /opt/slurm-exporter-{{ slurm_exporter_version }}/prometheus-slurm-exporter
+    dest: /usr/local/bin/prometheus-slurm-exporter
+    state: link
+  notify: Restart the Slurm exporter
+
+- name: Install the service
+  ansible.builtin.template:
+    src: slurm-exporter.service.j2
+    dest: /etc/systemd/system/slurm-exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the Slurm exporter
+
+- name: Run the exporter
+  ansible.builtin.systemd_service:
+    name: slurm-exporter
+    enabled: true
+    state: started
+    daemon_reload: true

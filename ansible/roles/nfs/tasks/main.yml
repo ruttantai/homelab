@@ -1,0 +1,72 @@
+- name: Head exports /srv/shared and /opt/spack
+  when: inventory_hostname in groups['hpc_head']
+  block:
+    - name: Install the NFS server
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: present
+
+    - name: Create the exported directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop: ["{{ hpc_shared_export }}", "{{ spack_root }}"]
+
+    - name: Give ops a directory on shared storage
+      ansible.builtin.file:
+        path: "{{ hpc_shared_export }}/ops"
+        state: directory
+        owner: ops
+        group: ops
+        mode: "0755"
+
+    - name: Write /etc/exports
+      ansible.builtin.template:
+        src: exports.j2
+        dest: /etc/exports
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Re-export NFS shares
+
+    - name: Run the NFS server
+      ansible.builtin.systemd_service:
+        name: nfs-server
+        enabled: true
+        state: started
+
+    # The head sees the same path as the computes, so job scripts are identical everywhere.
+    - name: Bind /srv/shared to /shared on the head
+      ansible.posix.mount:
+        src: "{{ hpc_shared_export }}"
+        path: "{{ hpc_shared_dir }}"
+        fstype: none
+        opts: bind
+        state: mounted
+
+# apt starts nfs-server before /etc/exports exists; re-export now, not at the end of the play,
+# or the computes below mount against an empty export list.
+- name: Re-export before the computes mount
+  ansible.builtin.meta: flush_handlers
+
+- name: Computes mount the head's shares
+  when: inventory_hostname in groups['hpc_compute']
+  block:
+    - name: Install the NFS client
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+
+    - name: Mount /shared and /opt/spack
+      ansible.posix.mount:
+        src: "{{ hpc_head_ip }}:{{ item.export }}"
+        path: "{{ item.path }}"
+        fstype: nfs
+        opts: "{{ item.opts }}"
+        state: mounted
+      loop:
+        - { export: "{{ hpc_shared_export }}", path: "{{ hpc_shared_dir }}", opts: "rw,hard,_netdev" }
+        - { export: "{{ spack_root }}", path: "{{ spack_root }}", opts: "ro,hard,_netdev" }

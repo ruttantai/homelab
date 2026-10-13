@@ -1,0 +1,41 @@
+# Managed by Ansible (roles/slurm_common). Spec §4 and §10.
+ClusterName=homelab
+SlurmctldHost={{ hpc_head }}({{ hpc_head_ip }})
+SlurmUser=slurm
+AuthType=auth/munge
+StateSaveLocation=/var/spool/slurmctld
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+SlurmctldPidFile=/run/slurmctld.pid
+SlurmdPidFile=/run/slurmd.pid
+SchedulerType=sched/backfill
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core_Memory
+# cgroups enforce --mem (cgroup.conf: ConstrainRAMSpace).
+ProctrackType=proctrack/cgroup
+TaskPlugin=task/cgroup,task/affinity
+# A node that registers after a power-up (or a lab reboot) returns to service by itself.
+ReturnToService=2
+# No slurmdbd: finished jobs stay visible to scontrol and the exporter for 10 minutes,
+# and every completion is written to the jobcomp log (spec §10.6).
+MinJobAge=600
+JobCompType=jobcomp/filetxt
+JobCompLoc=/var/log/slurm/jobcomp.log
+# srun listens for slurmd call-backs; a fixed range lets ufw allow them (spec §10.5).
+SrunPortRange={{ slurm_srun_ports }}
+{% if slurm_power_enabled %}
+# Elastic compute nodes (spec §5): idle nodes are stopped, queued work starts them.
+SuspendProgram=/usr/local/sbin/slurm-suspend
+ResumeProgram=/usr/local/sbin/slurm-resume
+SuspendTime={{ slurm_suspend_time }}
+SuspendTimeout=60
+ResumeTimeout=300
+ResumeRate=0
+SuspendRate=0
+{% endif %}
+{% for n in groups['hpc_compute'] %}
+NodeName={{ n }} NodeAddr={{ hostvars[n]['ansible_host'] }} CPUs={{ slurm_node_cpus }} RealMemory={{ slurm_node_realmem }} State=UNKNOWN
+{% endfor %}
+PartitionName=short Nodes={{ groups['hpc_compute'] | join(',') }} Default=YES MaxTime=00:15:00 State=UP
+PartitionName=long Nodes={{ groups['hpc_compute'] | join(',') }} MaxTime=02:00:00 State=UP

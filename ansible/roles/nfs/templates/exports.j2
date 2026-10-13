@@ -1,0 +1,3 @@
+# Managed by Ansible (roles/nfs). Spec §10.1: /shared, never /home.
+{{ hpc_shared_export }} {{ hpc_subnet }}(rw,sync,no_subtree_check)
+{{ spack_root }} {{ hpc_subnet }}(ro,sync,no_subtree_check)

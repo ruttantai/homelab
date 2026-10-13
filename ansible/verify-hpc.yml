@@ -1,0 +1,147 @@
+# Assertions about the running HPC stack. `make hpc-verify` runs this between hold and release.
+# Checks that touch compute nodes go through srun from the head, as a user would (spec §10.7).
+- name: Verify HPC node baseline
+  hosts: hpc
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read effective sshd settings
+      ansible.builtin.command: sshd -T
+      register: verify_sshd
+      changed_when: false
+
+    - name: Password and root login are off
+      ansible.builtin.assert:
+        that:
+          - "'passwordauthentication no' in verify_sshd.stdout_lines"
+          - "'permitrootlogin no' in verify_sshd.stdout_lines"
+
+    - name: Read firewall status
+      ansible.builtin.command: ufw status verbose
+      register: verify_ufw
+      changed_when: false
+
+    - name: Firewall is on, denies by default, and has no Kubernetes rules
+      ansible.builtin.assert:
+        that:
+          - "'Status: active' in verify_ufw.stdout"
+          - "'deny (incoming)' in verify_ufw.stdout"
+          - "'6443' not in verify_ufw.stdout"
+
+- name: Verify Slurm
+  hosts: hpc_head
+  gather_facts: false
+  vars:
+    verify_dir: "{{ hpc_shared_dir }}/ops"
+  tasks:
+    - name: Read partitions
+      ansible.builtin.command: sinfo -h -o '%R'
+      register: verify_parts
+      changed_when: false
+
+    - name: Partitions short and long exist
+      ansible.builtin.assert:
+        that: verify_parts.stdout_lines | sort == ['long', 'short']
+
+    - name: Read nodes
+      ansible.builtin.command: sinfo -h -N -o '%N'
+      register: verify_nodes
+      changed_when: false
+
+    - name: Both compute nodes are in Slurm
+      ansible.builtin.assert:
+        that: verify_nodes.stdout_lines | unique | sort == groups['hpc_compute'] | sort
+
+    - name: A two-node job runs on both nodes (also proves munge across nodes)
+      ansible.builtin.command:
+        cmd: srun -N2 -p short hostname
+        chdir: "{{ verify_dir }}"
+      register: verify_srun
+      changed_when: false
+
+    - name: Two distinct hostnames came back
+      ansible.builtin.assert:
+        that: verify_srun.stdout_lines | unique | sort == groups['hpc_compute'] | sort
+
+    - name: Pick a value for the shared-storage check
+      ansible.builtin.set_fact:
+        verify_token: "{{ 2147483647 | random }}"
+
+    - name: Write it on hpc-node-1
+      ansible.builtin.command:
+        cmd: srun -N1 -w {{ groups['hpc_compute'][0] }} bash -c 'echo {{ verify_token }} > {{ verify_dir }}/verify-nfs'
+        chdir: "{{ verify_dir }}"
+      changed_when: false
+
+    - name: Read it on hpc-node-2
+      ansible.builtin.command:
+        cmd: srun -N1 -w {{ groups['hpc_compute'][1] }} cat {{ verify_dir }}/verify-nfs
+        chdir: "{{ verify_dir }}"
+      register: verify_nfs
+      changed_when: false
+
+    - name: Shared storage is shared
+      ansible.builtin.assert:
+        that: verify_nfs.stdout | trim == verify_token | string
+
+    - name: A job asking for more memory than any node has is refused at submit (Review Focus 4)
+      ansible.builtin.command:
+        cmd: sbatch -p short --mem=4G --wrap 'true'
+        chdir: "{{ verify_dir }}"
+      register: verify_toobig
+      changed_when: false
+      failed_when: verify_toobig.rc == 0
+
+    - name: Submit a job that exceeds its --mem
+      ansible.builtin.command:
+        cmd: >-
+          sbatch --parsable -p short --mem=100M
+          --wrap "python3 -c 'b = bytearray(400 * 1024 * 1024); import time; time.sleep(5)'"
+        chdir: "{{ verify_dir }}"
+      register: verify_oom_job
+      changed_when: false
+
+    - name: Wait for it to finish
+      ansible.builtin.command: scontrol show job {{ verify_oom_job.stdout | trim }} -o
+      register: verify_oom_state
+      changed_when: false
+      until: verify_oom_state.stdout is search('JobState=(OUT_OF_MEMORY|FAILED|COMPLETED|CANCELLED|TIMEOUT)')
+      retries: 40
+      delay: 5
+
+    - name: Slurm killed it for memory (the Slurm side of the OOM story)
+      ansible.builtin.assert:
+        that: verify_oom_state.stdout is search('JobState=OUT_OF_MEMORY')
+
+    - name: Put the GSL test program on shared storage
+      ansible.builtin.copy:
+        src: files/bessel.c
+        dest: "{{ verify_dir }}/bessel.c"
+        mode: "0644"
+
+    - name: Compile and run it on a compute node with the Spack-built module
+      ansible.builtin.command:
+        cmd: >-
+          srun -N1 -w {{ groups['hpc_compute'][0] }} bash -lc
+          'module load gsl && gcc -o bessel bessel.c $(pkg-config --cflags --libs gsl)
+          -Wl,-rpath,$(pkg-config --variable=libdir gsl) && ./bessel'
+        chdir: "{{ verify_dir }}"
+      register: verify_gsl
+      changed_when: false
+
+    # 14 significant digits: the GSL manual's printout and GSL 2.8 differ in the 16th.
+    - name: The module's library gives J0(5) correctly
+      ansible.builtin.assert:
+        that: "'J0(5) = -1.7759677131433' in verify_gsl.stdout"
+
+    - name: Read the exporter's metrics on the head
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ slurm_exporter_port }}/metrics"
+        return_content: true
+      register: verify_metrics
+
+    - name: The exporter reports node and job states
+      ansible.builtin.assert:
+        that:
+          - "'slurm_node_count_per_state' in verify_metrics.content"
+          - "'slurm_partition_job_state_total' in verify_metrics.content"
