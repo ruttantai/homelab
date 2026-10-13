@@ -1,0 +1,83 @@
+# promtool test rules monitoring/slurm/slurm-rules.test.yaml
+rule_files: [slurm-rules.yaml]
+evaluation_interval: 1m
+
+tests:
+  # Powered-down nodes are normal on an elastic cluster and must never alert.
+  - interval: 1m
+    input_series:
+      - series: 'slurm_node_count_per_state{state="idle~"}'
+        values: "2x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SlurmNodeUnavailable
+        exp_alerts: []
+
+  # A down node fires after the 2-minute hold, not before.
+  - interval: 1m
+    input_series:
+      - series: 'slurm_node_count_per_state{state="down"}'
+        values: "1x10"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: SlurmNodeUnavailable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: SlurmNodeUnavailable
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "1 Slurm node(s) down or drained"
+
+  - interval: 1m
+    input_series:
+      - series: 'slurm_node_count_per_state{state="drained"}'
+        values: "1x10"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: SlurmNodeUnavailable
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "1 Slurm node(s) down or drained"
+
+  - interval: 1m
+    input_series:
+      - series: 'slurm_partition_job_state_total{partition="short",state="OUT_OF_MEMORY"}'
+        values: "1x5"
+      - series: 'slurm_partition_job_state_total{partition="short",state="COMPLETED"}'
+        values: "3x5"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: SlurmJobsFailing
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "1 Slurm job(s) ended FAILED, OUT_OF_MEMORY, TIMEOUT or NODE_FAIL in the last 10 minutes"
+
+  - interval: 1m
+    input_series:
+      - series: 'slurm_partition_job_state_total{partition="short",state="COMPLETED"}'
+        values: "3x5"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: SlurmJobsFailing
+        exp_alerts: []
+
+  # Exact label strings read from the exporter on 2026-10-13 (nodes powered off, jobs from hpc-verify).
+  - interval: 1m
+    input_series:
+      - series: 'slurm_node_count_per_state{state="idle~"}'
+        values: "2x5"
+      - series: 'slurm_partition_job_state_total{partition="short",state="FAILED"}'
+        values: "2x5"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: SlurmNodeUnavailable
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: SlurmJobsFailing
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "2 Slurm job(s) ended FAILED, OUT_OF_MEMORY, TIMEOUT or NODE_FAIL in the last 10 minutes"

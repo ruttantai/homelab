@@ -36,6 +36,8 @@ prometheus:
     retention: 2d
     # Pick up PrometheusRules that are not labelled for this Helm release (ours).
     ruleSelectorNilUsesHelmValues: false
+    # Pick up ScrapeConfig resources that are not labelled for this Helm release (the Slurm job).
+    scrapeConfigSelectorNilUsesHelmValues: false
     resources:
       requests:
         cpu: 100m

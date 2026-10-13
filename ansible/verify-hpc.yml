@@ -133,3 +133,15 @@
     - name: The module's library gives J0(5) correctly
       ansible.builtin.assert:
         that: "'J0(5) = -1.7759677131433' in verify_gsl.stdout"
+
+    - name: Read the exporter's metrics on the head
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ slurm_exporter_port }}/metrics"
+        return_content: true
+      register: verify_metrics
+
+    - name: The exporter reports node and job states
+      ansible.builtin.assert:
+        that:
+          - "'slurm_node_count_per_state' in verify_metrics.content"
+          - "'slurm_partition_job_state_total' in verify_metrics.content"

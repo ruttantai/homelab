@@ -39,3 +39,7 @@ power_api_port: 8765
 
 spack_version: v1.2.2
 spack_packages: ["gsl@2.8"]
+
+slurm_exporter_version: "1.8.0"
+slurm_exporter_sha256: 38adb5e51df1c4fa43709e4f03cc9eb67264bd923eff63ef357b13a96d1a09ef
+slurm_exporter_port: 9092

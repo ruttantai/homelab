@@ -28,6 +28,13 @@ jobs:
       - run: shellcheck scripts/*.sh ansible/roles/slurm_power/files/slurm-power
       - run: scripts/test-slurm-power.sh
       - run: scripts/test-hpc-lib.sh
+      - name: promtool
+        run: |
+          curl -sSL https://github.com/prometheus/prometheus/releases/download/v3.15.0/prometheus-3.15.0.linux-amd64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP" --strip-components=1 prometheus-3.15.0.linux-amd64/promtool
+          "$RUNNER_TEMP/promtool" check rules monitoring/slurm/slurm-rules.yaml
+          "$RUNNER_TEMP/promtool" test rules monitoring/slurm/slurm-rules.test.yaml
+          python3 -m json.tool monitoring/slurm/slurm-dashboard.json >/dev/null
       - run: pip install ansible-core==2.21.4 ansible-lint==26.9.0
       - run: ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
       - run: ansible-lint

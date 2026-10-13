@@ -1,0 +1,12 @@
+# Managed by Ansible (roles/slurm_exporter). rivosinc prometheus-slurm-exporter v{{ slurm_exporter_version }}.
+[Unit]
+Description=Prometheus Slurm exporter
+After=network-online.target slurmctld.service munge.service
+
+[Service]
+ExecStart=/usr/local/bin/prometheus-slurm-exporter -slurm.cli-fallback -web.listen-address=:{{ slurm_exporter_port }}
+DynamicUser=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

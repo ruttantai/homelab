@@ -12,7 +12,7 @@ SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency power-api-token power-api-start power-api-stop hpc-hold hpc-release elastic-demo hpc-up
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down hpc-configure hpc-verify hpc-idempotency power-api-token power-api-start power-api-stop hpc-hold hpc-release elastic-demo hpc-up hpc-monitoring hpc-monitoring-verify
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -52,6 +52,9 @@ lint:
 	shellcheck scripts/*.sh ansible/roles/slurm_power/files/slurm-power
 	scripts/test-slurm-power.sh
 	scripts/test-hpc-lib.sh
+	promtool check rules monitoring/slurm/slurm-rules.yaml
+	promtool test rules monitoring/slurm/slurm-rules.test.yaml
+	python3 -m json.tool monitoring/slurm/slurm-dashboard.json >/dev/null
 	$(MAKE) power-api-test
 
 # The power API is stdlib-only; pytest is a test-time dependency, kept in its own venv.
@@ -136,3 +139,10 @@ elastic-demo:
 	scripts/check-elastic.sh
 
 hpc-up: prereqs hpc-infra power-api-start hpc-configure
+
+# Needs both stacks up (spec §6): about 14 GiB of RAM.
+hpc-monitoring: collections
+	cd ansible && ansible-playbook -i inventory/hosts.yml -i inventory/hpc.yml monitoring-hpc.yml
+
+hpc-monitoring-verify: collections
+	cd ansible && ansible-playbook -i inventory/hosts.yml -i inventory/hpc.yml verify-hpc-monitoring.yml

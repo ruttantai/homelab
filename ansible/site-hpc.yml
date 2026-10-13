@@ -32,3 +32,4 @@
   roles:
     - slurm_head
     - spack
+    - slurm_exporter

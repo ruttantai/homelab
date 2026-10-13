@@ -1,0 +1,33 @@
+{
+  "title": "Slurm (homelab)",
+  "uid": "slurm-homelab",
+  "schemaVersion": 39,
+  "time": { "from": "now-3h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries", "title": "Nodes by state (idle~ = powered off)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (state) (slurm_node_count_per_state)", "legendFormat": "{{state}}" }]
+    },
+    {
+      "type": "timeseries", "title": "Jobs by state",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (state) (slurm_partition_job_state_total)", "legendFormat": "{{state}}" }]
+    },
+    {
+      "type": "timeseries", "title": "CPUs by state",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (state) (slurm_cpus_per_state)", "legendFormat": "{{state}}" }]
+    },
+    {
+      "type": "stat", "title": "Exporter up",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(up{job=~\".*slurm.*\"})" }]
+    }
+  ]
+}
