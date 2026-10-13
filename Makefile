@@ -6,11 +6,13 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 TF := terraform -chdir=terraform
+TF_HPC := terraform -chdir=terraform/hpc
+HPC_VMS := hpc-head hpc-node-1 hpc-node-2
 SSH_KEY := $(HOME)/.ssh/homelab_ed25519
 export KUBECONFIG := $(HOME)/.kube/homelab.yaml
 export ANSIBLE_CONFIG := $(CURDIR)/ansible/ansible.cfg
 
-.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test
+.PHONY: help prereqs keys lint infra down collections configure verify idempotency smoke urls oom-demo up status test power-api-test hpc-infra hpc-down
 
 help:
 	@echo "make up | down | test | oom-demo | status | lint | prereqs"
@@ -41,6 +43,9 @@ lint:
 	$(TF) init -backend=false -input=false >/dev/null
 	$(TF) validate
 	$(TF) test
+	$(TF_HPC) init -backend=false -input=false >/dev/null
+	$(TF_HPC) validate
+	$(TF_HPC) test
 	cd ansible && ansible-lint
 	set -o pipefail; kubectl kustomize k8s/ley-khaa | kubeconform -strict -summary -
 	kubeconform -strict -summary k8s/demo
@@ -87,3 +92,13 @@ status:
 # KEEP=1 skips the teardown so a failure can be inspected.
 test:
 	KEEP=$(KEEP) scripts/test.sh
+
+# Separate state from the k3s module (spec §3), so neither stack's down can destroy the other.
+hpc-infra: keys
+	$(TF_HPC) init -input=false
+	$(TF_HPC) apply -auto-approve -input=false -parallelism=1
+
+hpc-down:
+	$(TF_HPC) init -input=false >/dev/null
+	$(TF_HPC) destroy -auto-approve -input=false
+	for n in $(HPC_VMS); do multipass delete --purge $$n >/dev/null 2>&1 || true; done

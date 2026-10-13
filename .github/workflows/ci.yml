@@ -17,6 +17,9 @@ jobs:
       - run: terraform -chdir=terraform init -backend=false -input=false
       - run: terraform -chdir=terraform validate
       - run: terraform -chdir=terraform test
+      - run: terraform -chdir=terraform/hpc init -backend=false -input=false
+      - run: terraform -chdir=terraform/hpc validate
+      - run: terraform -chdir=terraform/hpc test
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

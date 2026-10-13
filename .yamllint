@@ -3,6 +3,8 @@ ignore: |
   terraform/.terraform/
   ansible/collections/
   terraform/cloud-init.rendered.yaml
+  terraform/hpc/.terraform/
+  terraform/hpc/cloud-init.rendered.yaml
 rules:
   line-length:
     max: 140
